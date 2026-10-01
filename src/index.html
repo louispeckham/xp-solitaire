@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="XP.css">
+  <style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent !important;
+    font-family: "Tahoma", "Segoe UI", sans-serif;
+    /* Native-app feel: normal arrow everywhere, no text selection */
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Nothing in the chrome should animate - real XP menus snap instantly */
+  .window *, .menu-bar * {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .window {
+    width: 100vw !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 0 3px 0 !important;      /* 3px XP frame at the bottom */
+    background: #0054e3 !important;     /* Luna blue shows through the side/bottom margins */
+    box-sizing: border-box !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;        /* transparent window would clip it anyway */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ---------- Title bar: back to XP.css proportions ---------- */
+  .title-bar {
+    -webkit-app-region: drag;
+    margin: 0 !important;
+    padding: 3px 5px 3px 3px !important;   /* was 6px 7px - this made it chunky */
+    min-height: 21px;
+    box-sizing: content-box;
+    border-radius: 8px 8px 0 0 !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    cursor: default;
+  }
+
+  .title-bar-controls {
+    -webkit-app-region: no-drag !important;
+    display: flex;
+    gap: 2px;
+    margin: 0 !important;
+  }
+
+  .title-bar-controls button {
+    -webkit-app-region: no-drag !important;
+    cursor: default !important;          /* was pointer = the "clicky hand" */
+    width: 21px;
+    height: 21px;
+    min-width: 21px !important;
+    min-height: 21px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    outline: none !important;
+  }
+  .title-bar-controls button:focus { outline: none !important; }
+
+  /* ---------- Menu bar: flat XP style ---------- */
+  .menu-bar {
+    display: flex;
+    flex: none;
+    background-color: #ece9d8;
+    margin: 0 3px !important;
+    padding: 1px 0;
+    font-size: 11px;
+    line-height: 1;
+    color: #000;
+    -webkit-app-region: no-drag !important;
+    cursor: default;
+  }
+
+  .menu-item {
+    position: relative;
+    padding: 3px 7px 4px;
+    cursor: default;
+  }
+
+  .menu-item:hover,
+  .menu-item.open {
+    background-color: #316ac5;
+    color: #fff;
+  }
+
+  .dropdown-content {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 150px;
+    padding: 2px;
+    box-sizing: border-box;
+    background-color: #fff;
+    border: 1px solid #aca899;
+    box-shadow: 2px 2px 2px rgba(0,0,0,0.4);
+    z-index: 1000;
+    color: #000;
+  }
+
+  .menu-item.open > .dropdown-content { display: block; }
+
+  .dropdown-content .item {
+    padding: 4px 24px 4px 22px;
+    white-space: nowrap;
+    cursor: default;
+  }
+  .dropdown-content .item:hover {
+    background-color: #316ac5;
+    color: #fff;
+  }
+  .dropdown-content .item.checked::before {
+    content: "\2713";
+    position: absolute;
+    left: 8px;
+  }
+  .dropdown-content .sep {
+    height: 1px;
+    margin: 3px 2px;
+    background: #aca899;
+  }
+
+  /* ---------- Game area ---------- */
+  .window-body {
+    flex: 1;
+    padding: 0 !important;
+    margin: 0 3px !important;
+    border: none !important;
+    outline: none !important;
+    background-color: #008000 !important;
+    overflow: auto;
+  }
+
+  .solitaire, #js-solitaire {
+    width: 100%;
+    height: 100%;
+    background-color: #008000;
+    box-sizing: border-box;
+    padding: 10px;
+  }
+
+  .window__actions { display: none !important; }
+</style>
+</head>
+<body>
+  <div class="window">
+    <div class="title-bar" data-tauri-drag-region>
+      <div class="title-bar-text" data-tauri-drag-region>Solitaire</div>
+      <div class="title-bar-controls">
+        <button aria-label="Minimize" id="min-btn"></button>
+        <button aria-label="Maximize" id="max-btn"></button>
+        <button aria-label="Close" id="close-btn"></button>
+      </div>
+    </div>
+
+    <!-- XP Menu bar -->
+    <div class="menu-bar" id="menu-bar">
+      <div class="menu-item">
+        <span>Game</span>
+        <div class="dropdown-content">
+          <div class="item" id="menu-new-game">New Game</div>
+          <div class="sep"></div>
+          <div class="item" id="menu-exit">Exit</div>
+        </div>
+      </div>
+      <div class="menu-item">
+        <span>Help</span>
+        <div class="dropdown-content">
+          <div class="item checked" id="scale-10">1.0x Scale</div>
+          <div class="item" id="scale-15">1.5x Scale</div>
+          <div class="item" id="scale-20">2.0x Scale</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="window-body">
+      <div class="solitaire" id="js-solitaire">
+        <!-- Hidden DOM element for solitairemain.js logic target -->
+        <div class="window__actions">
+          <button type="button" id="js-reset" class="new-game">New game</button>
+        </div>
+        <div id="js-finish" class="finish-deck"></div>
+        <div id="js-board" class="board-deck"></div>
+        <div class="deck">
+          <div id="js-deck-pile" class="deck__pile"></div>
+          <div id="js-deck-deal" class="deck__deal"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="solitairemain.js"></script>
+  <script>
+    // Tauri replacement for the Electron preload.js bridge
+    (() => {
+      const { getCurrentWindow } = window.__TAURI__.window;
+      const { getCurrentWebview } = window.__TAURI__.webview;
+      const { LogicalSize } = window.__TAURI__.dpi;
+      const win = getCurrentWindow();
+      window.windowControls = {
+        minimize: () => win.minimize(),
+        maximize: () => win.toggleMaximize(),
+        close: () => win.close(),
+        setScale: async (scale) => {
+          await win.setSize(new LogicalSize(Math.round(800 * scale), Math.round(600 * scale)));
+          await getCurrentWebview().setZoom(scale);
+        }
+      };
+    })();
+  </script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // Window controls
+      document.getElementById('min-btn')?.addEventListener('click', () => window.windowControls?.minimize());
+      document.getElementById('max-btn')?.addEventListener('click', () => window.windowControls?.maximize());
+      document.getElementById('close-btn')?.addEventListener('click', () => window.windowControls?.close());
+
+      // ---- XP menu behaviour: click to open, hover to switch, click away to close ----
+      const bar = document.getElementById('menu-bar');
+      const menus = [...bar.querySelectorAll('.menu-item')];
+      let menuActive = false;
+
+      const closeAll = () => {
+        menus.forEach(m => m.classList.remove('open'));
+        menuActive = false;
+      };
+      const openMenu = (m) => {
+        menus.forEach(x => x.classList.toggle('open', x === m));
+        menuActive = true;
+      };
+
+      menus.forEach(m => {
+        m.addEventListener('mousedown', (e) => {
+          if (e.target.closest('.dropdown-content')) return;   // clicks on items handled below
+          m.classList.contains('open') ? closeAll() : openMenu(m);
+        });
+        m.addEventListener('mouseenter', () => { if (menuActive) openMenu(m); });
+      });
+
+      // Click outside the menu bar closes it; so does Escape or losing focus
+      document.addEventListener('mousedown', (e) => { if (!bar.contains(e.target)) closeAll(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+      window.addEventListener('blur', closeAll);
+
+      // Picking an item runs it, then closes the menu (like real XP)
+      bar.querySelectorAll('.dropdown-content .item').forEach(item => {
+        item.addEventListener('click', () => closeAll());
+      });
+
+      // Menu actions
+      document.getElementById('menu-new-game')?.addEventListener('click', () => {
+        document.getElementById('js-reset')?.click();
+      });
+      document.getElementById('menu-exit')?.addEventListener('click', () => window.windowControls?.close());
+
+      // Scale options, with a tick next to the active one
+      const scales = { 'scale-10': 1.0, 'scale-15': 1.5, 'scale-20': 2.0 };
+      Object.entries(scales).forEach(([id, value]) => {
+        document.getElementById(id)?.addEventListener('click', () => {
+          Object.keys(scales).forEach(k => document.getElementById(k).classList.toggle('checked', k === id));
+          window.windowControls?.setScale(value);
+        });
+      });
+    });
+  </script>
+</body>
+</html>
