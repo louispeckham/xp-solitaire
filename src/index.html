@@ -160,6 +160,13 @@
   /* Win-animation canvas: pin it to the board's corner so it fits exactly
      (otherwise it sits 10px off and creates scroll bars) */
   #js-solitaire > canvas { top: 0; left: 0; }
+
+  /* Touch: the board handles its own gestures (no scrolling, pinch or text callouts) */
+  #js-solitaire, #js-solitaire * {
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
 </style>
 </head>
 <body>
@@ -282,6 +289,48 @@
         });
       });
     });
+  </script>
+
+  <script>
+    // Touch support: the game only listens for mouse events, so on the board we
+    // translate one-finger touches into the equivalent mouse events.
+    (() => {
+      const board = document.getElementById('js-solitaire');
+      let t = null;   // the finger currently being tracked
+
+      const mouse = (type, tc) => new MouseEvent(type, {
+        bubbles: true, cancelable: true, view: window, button: 0,
+        buttons: (type === 'mouseup' || type === 'click') ? 0 : 1,
+        clientX: tc.clientX, clientY: tc.clientY, screenX: tc.screenX, screenY: tc.screenY
+      });
+      const finger = (e) => t && [...e.changedTouches].find(x => x.identifier === t.id);
+
+      board.addEventListener('touchstart', (e) => {
+        if (t) return;                         // ignore extra fingers
+        const tc = e.changedTouches[0];
+        e.preventDefault();                    // no scrolling, no emulated mouse events
+        t = { id: tc.identifier, x0: tc.clientX, y0: tc.clientY, moved: false, target: e.target };
+        e.target.dispatchEvent(mouse('mousedown', tc));
+      }, { passive: false });
+
+      window.addEventListener('touchmove', (e) => {
+        const tc = finger(e); if (!tc) return;
+        e.preventDefault();
+        if (Math.hypot(tc.clientX - t.x0, tc.clientY - t.y0) > 4) t.moved = true;
+        window.dispatchEvent(mouse('mousemove', tc));
+      }, { passive: false });
+
+      const end = (e) => {
+        const tc = finger(e); if (!tc) return;
+        e.preventDefault();
+        const under = document.elementFromPoint(tc.clientX, tc.clientY) || t.target;
+        under.dispatchEvent(mouse('mouseup', tc));
+        if (e.type === 'touchend' && !t.moved) t.target.dispatchEvent(mouse('click', tc));   // a tap
+        t = null;
+      };
+      window.addEventListener('touchend', end, { passive: false });
+      window.addEventListener('touchcancel', end, { passive: false });
+    })();
   </script>
 </body>
 </html>
