@@ -156,6 +156,10 @@
   }
 
   .window__actions { display: none !important; }
+
+  /* Win-animation canvas: pin it to the board's corner so it fits exactly
+     (otherwise it sits 10px off and creates scroll bars) */
+  #js-solitaire > canvas { top: 0; left: 0; }
 </style>
 </head>
 <body>
