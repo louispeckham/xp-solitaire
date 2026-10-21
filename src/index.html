@@ -2,6 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="stylesheet" href="XP.css">
   <style>
   html, body {
@@ -167,6 +168,22 @@
     -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* ---------- Android ---------- */
+  .android body { background: #0054e3 !important; }
+  .android #menu-help { display: none; }                       /* scale options make no sense on a phone */
+  .android #js-solitaire { max-width: 700px; margin: 0 auto; } /* board stays centred on wide screens */
+
+  /* Landscape layout: stock + waste on the left, tableau in the middle, foundations 2x2 on the right.
+     Frees up ~140px of height so the cards can be drawn much bigger. */
+  .android.wide #js-solitaire { max-width: 940px; }
+  .android.wide .deck { top: 20px; }
+  .android.wide .deck__deal { left: 0; top: 120px; }
+  .android.wide .board-deck { top: 20px; left: 100px; }
+  .android.wide .finish-deck { top: 20px; left: 737px; width: 182px; }
+  .android.wide .finish-deck .aces { margin-bottom: 20px; }
+  /* keep the title bar and menu a comfortable finger size whatever the board scale is */
+  .android .title-bar, .android .menu-bar { zoom: var(--chrome-zoom, 1); }
 </style>
 </head>
 <body>
@@ -190,7 +207,7 @@
           <div class="item" id="menu-exit">Exit</div>
         </div>
       </div>
-      <div class="menu-item">
+      <div class="menu-item" id="menu-help">
         <span>Help</span>
         <div class="dropdown-content">
           <div class="item checked" id="scale-10">1.0x Scale</div>
@@ -218,21 +235,57 @@
 
   <script src="solitairemain.js"></script>
   <script>
-    // Tauri replacement for the Electron preload.js bridge
+    // Window-control bridge: Android (MainActivity.kt) or Tauri desktop
     (() => {
-      const { getCurrentWindow } = window.__TAURI__.window;
-      const { getCurrentWebview } = window.__TAURI__.webview;
-      const { LogicalSize } = window.__TAURI__.dpi;
-      const win = getCurrentWindow();
-      window.windowControls = {
-        minimize: () => win.minimize(),
-        maximize: () => win.toggleMaximize(),
-        close: () => win.close(),
-        setScale: async (scale) => {
-          await win.setSize(new LogicalSize(Math.round(800 * scale), Math.round(600 * scale)));
-          await getCurrentWebview().setZoom(scale);
-        }
-      };
+      const A = window.AndroidBridge;          // injected by MainActivity.kt
+
+      if (A) {
+        document.documentElement.classList.add('android');
+        document.querySelectorAll('[data-tauri-drag-region]').forEach(el => el.removeAttribute('data-tauri-drag-region'));
+        window.windowControls = {
+          minimize: () => A.minimize(),              // back to the home screen, game stays as it is
+          maximize: () => A.toggleFullscreen(),      // fullscreen on/off
+          close: () => A.closeAndClearCache(),       // clear cache and close the app
+          setScale: () => {}
+        };
+
+        // Fit the board to the window; re-runs on rotation and fullscreen.
+        // Portrait layout is 700x480, landscape layout is 940x340 (board only, in CSS px).
+        const meta = document.querySelector('meta[name=viewport]');
+        const CHROME_ZOOM_DP = 1.5;      // physical size of title bar / menu: 1 CSS px = 1.5dp
+        const CHROME_DP = 70;            // title bar + menu bar height at that size
+        const fit = () => {
+          const [w, h] = String(A.windowSizeDp()).split(',').map(Number);
+          if (!w || !h) return;
+          const avail = h - CHROME_DP;
+          const sNormal = Math.min(w / 700, avail / 480);
+          const sWide = Math.min(w / 940, avail / 340);
+          const wide = sWide > sNormal;
+          const sc = Math.max(sNormal, sWide);
+          document.documentElement.classList.toggle('wide', wide);
+          const content = `width=${Math.round(w / sc)}, user-scalable=no, viewport-fit=cover`;
+          if (meta.content !== content) meta.content = content;
+          document.documentElement.style.setProperty('--chrome-zoom', (CHROME_ZOOM_DP / sc).toFixed(3));
+        };
+        fit();
+        window.addEventListener('resize', fit);
+        window.addEventListener('orientationchange', fit);
+        setInterval(fit, 1000);
+      } else {
+        const { getCurrentWindow } = window.__TAURI__.window;
+        const { getCurrentWebview } = window.__TAURI__.webview;
+        const { LogicalSize } = window.__TAURI__.dpi;
+        const win = getCurrentWindow();
+        window.windowControls = {
+          minimize: () => win.minimize(),
+          maximize: () => win.toggleMaximize(),
+          close: () => win.close(),
+          setScale: async (scale) => {
+            await win.setSize(new LogicalSize(Math.round(800 * scale), Math.round(600 * scale)));
+            await getCurrentWebview().setZoom(scale);
+          }
+        };
+      }
     })();
   </script>
   <script>
